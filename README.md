@@ -1,36 +1,120 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Hivon Blog Platform
 
-## Getting Started
+A full-stack blogging platform built with Next.js and Supabase.
 
-First, run the development server:
+## Tech Stack
+
+- **Frontend + Backend**: Next.js 14 (App Router)
+- **Authentication**: Supabase Auth
+- **Database**: Supabase (PostgreSQL)
+- **AI Integration**: Hugging Face Inference API (facebook/bart-large-cnn)
+- **Styling**: Tailwind CSS
+- **Deployment**: Netlify
+
+## Features
+
+- Email/password authentication
+- Three user roles: Viewer, Author, Admin
+- Create, edit, and view blog posts
+- Featured image upload via Supabase Storage
+- AI-generated post summaries (generated once, stored in DB)
+- Comments on posts
+- Search posts by title
+- Pagination (6 posts per page)
+- Admin dashboard for monitoring posts and comments
+
+## Project Setup
+
+### Prerequisites
+- Node.js 18+
+- Supabase account
+- Hugging Face account
+
+### Installation
+
+```bash
+git clone https://github.com/harsh-0905/hivon-blog.git
+cd hivon-blog
+npm install
+```
+
+### Environment Variables
+
+Create `.env.local` in the root:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+HUGGINGFACE_API_KEY=your_huggingface_token
+```
+
+### Database Setup
+
+Run this SQL in Supabase SQL Editor:
+
+```sql
+create table public.users (
+  id uuid references auth.users(id) on delete cascade primary key,
+  name text not null,
+  email text not null unique,
+  role text not null default 'viewer'
+);
+
+create table public.posts (
+  id uuid default gen_random_uuid() primary key,
+  title text not null,
+  body text not null,
+  image_url text,
+  summary text,
+  author_id uuid references public.users(id) not null,
+  created_at timestamptz default now()
+);
+
+create table public.comments (
+  id uuid default gen_random_uuid() primary key,
+  post_id uuid references public.posts(id) not null,
+  user_id uuid references public.users(id) not null,
+  comment_text text not null,
+  created_at timestamptz default now()
+);
+```
+
+### Run Locally
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## User Roles
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Role | Permissions |
+|------|------------|
+| Viewer | View posts, read summaries, comment |
+| Author | Create posts, edit own posts, view comments |
+| Admin | Edit any post, monitor all comments |
 
-## Learn More
+To set a user as admin or author, update the role in Supabase:
 
-To learn more about Next.js, take a look at the following resources:
+```sql
+update public.users set role = 'author' where email = 'user@example.com';
+update public.users set role = 'admin' where email = 'admin@example.com';
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deployment Steps
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Push code to GitHub
+2. Go to [netlify.com](https://netlify.com)
+3. Import GitHub repository
+4. Add environment variables in Project Configuration
+5. Deploy
 
-## Deploy on Vercel
+## AI Integration
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+When a post is created:
+1. Post body is sent to Hugging Face API
+2. A ~200 word summary is generated
+3. Summary is stored in the `posts.summary` column
+4. Summary is displayed on post listing and post detail pages
+5. API is never called again for the same post (cost optimization)
